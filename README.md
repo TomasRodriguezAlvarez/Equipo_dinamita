@@ -81,7 +81,6 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 ```
 
-> Si tu driver es más antiguo y `cu126` falla, prueba con `cu121`.
 > Para otras versiones consulta el selector oficial: https://pytorch.org/get-started/locally/
 
 ### 4. Instalar el resto de dependencias
@@ -168,15 +167,4 @@ eval_tf = transforms.Compose([
 img = Image.open('../imagenes_a_test/mi_imagen.jpg').convert('RGB')
 # x = eval_tf(img).unsqueeze(0)  ->  model(x)  ->  softmax  ->  clase
 ```
-
-Consulta la celda de **Inferencia** del notebook para el código completo.
-
 ---
-
-## Resultados de referencia
-
-Entrenando 5 épocas desde cero (sin *transfer learning*):
-
-- **Test accuracy:** ~51 %
-
-Para mejorar el desempeño puedes: aumentar el número de épocas, añadir `BatchNorm`, o usar *transfer learning* con una red preentrenada (ResNet18 / MobileNet), que suele alcanzar 80–90 %+.
