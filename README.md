@@ -168,3 +168,120 @@ img = Image.open('../imagenes_a_test/mi_imagen.jpg').convert('RGB')
 # x = eval_tf(img).unsqueeze(0)  ->  model(x)  ->  softmax  ->  clase
 ```
 ---
+
+
+# TensorFlow (Transfer Learning con MobileNetV3Small)
+
+## Modelo implementado
+
+Además del modelo desarrollado en PyTorch, se implementó una segunda
+solución utilizando **TensorFlow/Keras** mediante **Transfer Learning**
+con **MobileNetV3Small** preentrenado en ImageNet.
+
+El desarrollo se realizó en:
+
+`tensorflow/TrashNet_MobileNetV3.ipynb`
+
+------------------------------------------------------------------------
+
+## Instalación
+
+``` bash
+conda activate frameworks-ia
+```
+
+Si el entorno no existe:
+
+``` bash
+conda create -n frameworks-ia python=3.11 -y
+conda activate frameworks-ia
+pip install tensorflow numpy matplotlib pillow jupyter ipykernel
+python -m ipykernel install --user --name frameworks-ia --display-name "Python (frameworks-ia)"
+```
+
+------------------------------------------------------------------------
+
+## Ejecución
+
+``` bash
+cd tensorflow
+jupyter notebook
+```
+
+Abrir:
+
+`TrashNet_MobileNetV3.ipynb`
+
+------------------------------------------------------------------------
+
+## Flujo del notebook
+
+1.  Imports.
+2.  Configuración.
+3.  Carga del dataset.
+4.  Revisión de imágenes por clase.
+5.  Cálculo de Class Weights.
+6.  Data Augmentation.
+7.  MobileNetV3Small.
+8.  Entrenamiento (Fase 1).
+9.  Evaluación.
+10. Gráficos de Accuracy y Loss.
+11. Guardado del modelo.
+
+------------------------------------------------------------------------
+
+## Configuración
+
+  Parámetro                                Valor
+  ------------------- --------------------------
+  IMG_SIZE                               160x160
+  BATCH_SIZE                                   4
+  Optimizer                                 Adam
+  Learning Rate                            0.001
+  Loss                  categorical_crossentropy
+  Data Augmentation                           Sí
+  Class Weights                               Sí
+
+------------------------------------------------------------------------
+
+## Resultados
+
+  Modelo               Test Accuracy
+  ------------------ ---------------
+  CNN TensorFlow              57.8 %
+  MobileNetV3Small            81.0 %
+
+La utilización de Transfer Learning permitió mejorar el rendimiento en
+aproximadamente 23 puntos porcentuales.
+
+------------------------------------------------------------------------
+
+## Modelo generado
+
+`tensorflow/modelo_guardado/trashnet_mobilenetv3_small_fase1.keras`
+
+Carga del modelo:
+
+``` python
+import tensorflow as tf
+
+modelo = tf.keras.models.load_model(
+    "modelo_guardado/trashnet_mobilenetv3_small_fase1.keras"
+)
+```
+
+------------------------------------------------------------------------
+
+## Limitaciones
+
+El entrenamiento se realizó en una instancia AWS Academy con memoria
+limitada (\~1 GB RAM).
+
+Para garantizar estabilidad fue necesario:
+
+-   IMG_SIZE = 160x160.
+-   BATCH_SIZE = 4.
+-   No utilizar prefetch(AUTOTUNE).
+-   No realizar Fine-Tuning completo por restricciones de memoria.
+
+------------------------------------------------------------------------
