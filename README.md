@@ -1,5 +1,12 @@
 # Equipo Dinamita — TrashNet (PyTorch + TensorFlow)
 
+Integrantes:
+- Tomás Rodríguez
+- Benjamín Sanchez
+
+Link de descarga del dataset:
+https://www.kaggle.com/datasets/feyzazkefe/trashnet
+
 Clasificador de imágenes de residuos en **6 categorías**:
 
 - cardboard
