@@ -1,0 +1,22 @@
+{
+  "metrica": "macro_auc",
+  "mejor_valor": 0.9143186287138437,
+  "mejor_trial": 17,
+  "epocas_trial": 12,
+  "n_trials": 27,
+  "params": {
+    "n_bloques": 3,
+    "filtros_base": 16,
+    "units_fc": 128,
+    "activacion": "elu",
+    "dropout": 0.25,
+    "usar_bn": false,
+    "weight_decay": 0.00034144444840568985,
+    "aug": "media",
+    "optimizer": "adamw",
+    "lr": 0.0009776368447847285,
+    "batch_size": 64,
+    "img_size": 150,
+    "class_weight": false
+  }
+}
