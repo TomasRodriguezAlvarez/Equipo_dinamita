@@ -1,0 +1,50 @@
+TrashNet — PyTorch + Optuna · Reporte de evaluación
+======================================================================
+Device: cuda
+Optuna: no usado (hiperparámetros baseline del notebook)
+
+Hiperparámetros
+----------------------------------------------------------------------
+  n_bloques     : 3
+  filtros_base  : 16
+  units_fc      : 128
+  activacion    : relu
+  dropout       : 0.3
+  usar_bn       : False
+  weight_decay  : 0.0
+  aug           : media
+  optimizer     : adam
+  lr            : 0.001
+  batch_size    : 16
+  img_size      : 150
+  class_weight  : False
+
+Entrenamiento final
+----------------------------------------------------------------------
+  Parámetros del modelo : 155,558
+  Épocas corridas       : 50
+  Mejor época           : 44
+  Mejor val_accuracy    : 0.8249
+
+Resultados en TEST
+----------------------------------------------------------------------
+  Accuracy  : 0.7708  (77.1%)
+  Macro F1  : 0.7566
+  Macro AUC : 0.9517
+
+  Clase         Precision   Recall       F1      AUC      N
+  cardboard         0.909    0.820    0.862    0.974     61
+  glass             0.729    0.671    0.699    0.931     76
+  metal             0.667    0.742    0.702    0.951     62
+  paper             0.842    0.889    0.865    0.982     90
+  plastic           0.750    0.740    0.745    0.930     73
+  trash             0.652    0.682    0.667    0.943     22
+
+Matriz de confusión (filas = real, columnas = predicho)
+               cardboar    glass    metal    paper  plastic    trash
+  cardboard          50        0        2        3        3        3
+  glass               1       51       12        4        7        1
+  metal               0        6       46        4        5        1
+  paper               3        3        3       80        0        1
+  plastic             1        8        6        2       54        2
+  trash               0        2        0        2        3       15
