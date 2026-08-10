@@ -1,0 +1,28 @@
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Checkpoints automáticos de Jupyter
+.ipynb_checkpoints/
+
+# Entornos virtuales locales
+.venv/
+venv/
+env/
+
+# Config de editores e IDEs
+.vscode/
+.idea/
+*.swp
+
+# Basura del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# OJO — cosas que NO se ignoran a propósito:
+#   dataset/            el dataset está versionado en el repo (5055 archivos)
+#   *.pt, *.keras       los pesos de los modelos se versionan para el informe
+#   PyTorch/optuna/     study.db es la evidencia de la búsqueda
+#   hola.md             marcadores para que git conserve las carpetas vacías
