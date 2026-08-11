@@ -1,7 +1,7 @@
 # CONTEXT — rama PyTorch del proyecto TrashNet
 
 Documento de traspaso: en qué estado quedó la parte de PyTorch, qué decisiones se
-tomaron y por qué, y qué sigue. Última actualización: **2026-08-10**.
+tomaron y por qué, y qué sigue. Última actualización: **2026-08-10** (cuarto modelo).
 
 ---
 
@@ -14,16 +14,21 @@ mismos splits.
 Responsable de esta parte: Benjamín. El resto del equipo trabaja la versión de
 TensorFlow y el informe conjunto en `resultados/` (raíz).
 
-Estado actual: **tres modelos terminados y evaluados en test.**
+Estado actual: **cuatro modelos terminados y evaluados en test.**
 
 1. **CNN desde cero**, 6 clases de material — scripts + Optuna (§5).
 2. **MobileNetV3Small preentrenada**, 6 clases — transfer learning en 2 fases (§6).
 3. **Jerárquico por contenedor**, 4 clases — MobileNetV3Small con la búsqueda de
-   hiperparámetros ya corregida (§7). **Es el mejor modelo: 88.80% de accuracy.**
+   hiperparámetros ya corregida (§7). **Es el mejor multiclase: 88.80% de accuracy.**
+4. **Binario reciclable / basura**, 2 clases — con calibración de umbral y evaluación
+   fuera de distribución contra un dataset externo (§8).
 
 Lo más aprovechable para el informe no es el accuracy de ninguno de ellos por separado,
-sino la lección transversal sobre cuándo Optuna aporta y cuándo no (§8), que salió de
-comparar los tres.
+sino las dos lecciones transversales, que salieron de comparar los cuatro:
+
+- **cuándo Optuna aporta y cuándo no** (§9);
+- **que ninguno de los cuatro generaliza fuera de TrashNet** — el modelo 4 lo mide: F1
+  0.818 en su propio test, recall 0.119 con fotos reales (§8).
 
 ---
 
@@ -45,10 +50,10 @@ comprobarlo, y tiene que decir `.../envs/frameworks-ia/bin/python`.
 | numpy | 2.4.4 | `np.trapz` fue renombrado a `np.trapezoid` |
 | matplotlib | 3.11.0 | |
 | tensorflow | 2.21.0 | conviven en el mismo env |
-| **scikit-learn** | **NO instalado** | ver §9 |
+| **scikit-learn** | **NO instalado** | ver §10 |
 
 GPU: **NVIDIA GTX 1650 SUPER, 4 GB (3.63 GiB usables)**. Es la restricción más
-importante de todo este trabajo — ver §9.
+importante de todo este trabajo — ver §10.
 
 ---
 
@@ -75,24 +80,40 @@ PyTorch/
 ├── modelos/                                      pesos .pt de los modelos 1 y 2
 ├── predicciones/                                 figuras de los NOTEBOOKS 1 y 2
 │
-└── jerarquico/                                   MODELO 3, autocontenido
-    ├── TrashNet_PyTorch_Jerarquico_DEFINITIVO.ipynb
-    ├── modelos/                                  trashnet_jerarquico_{sin_optuna,optuna}.pt
-    └── predicciones/                             jer_*.png
+├── jerarquico/                                   MODELO 3, autocontenido
+│   ├── TrashNet_PyTorch_Jerarquico_DEFINITIVO.ipynb
+│   ├── modelos/                                  trashnet_jerarquico_{sin_optuna,optuna}.pt
+│   └── predicciones/                             jer_*.png
+│
+└── binario/                                      MODELO 4, autocontenido
+    ├── TrashNet_PyTorch_Binario_DEFINITIVO.ipynb
+    ├── modelos/                                  trashnet_binario_{sin_optuna,optuna}.pt
+    └── predicciones/                             bin_*.png
+```
+
+Y en la raíz del repo, fuera de `dataset/` a propósito:
+
+```
+dataset_gd/
+├── README.md      procedencia y licencia (CC BY 4.0)
+└── trash/         453 imágenes del Garbage Dataset, SOLO para evaluación (§8)
 ```
 
 Los scripts **no escriben** en la carpeta `resultados/` de la raíz del repo: esa es
 del informe conjunto del equipo. Si hay que aportar gráficos al informe, se copian a
 mano.
 
-El modelo 3 vive en su propia carpeta para no mezclar sus pesos y figuras con los de
-6 clases. Por eso su notebook usa `../../dataset` en vez de `../dataset`.
+Los modelos 3 y 4 viven en su propia carpeta para no mezclar sus pesos y figuras con
+los de 6 clases. Por eso sus notebooks usan `../../dataset` en vez de `../dataset`.
+
+`dataset_gd/` está fuera de `dataset/` para que ningún `ImageFolder` del proyecto lo
+recoja por accidente: **no es TrashNet y nunca se entrena con él.**
 
 Dataset en `dataset/` (raíz) con splits ya hechos: 1766 train / 377 val / 384 test.
 
 ---
 
-## 4. Los tres modelos de un vistazo
+## 4. Los cuatro modelos de un vistazo
 
 Todo medido en el mismo conjunto de test (384 imágenes), tocado una sola vez por modelo.
 
@@ -105,12 +126,21 @@ Todo medido en el mismo conjunto de test (384 imágenes), tocado una sola vez po
 | 1. CNN scratch baseline | 6 | 0.7708 | 0.7570 | 0.9517 |
 | 1. CNN scratch con Optuna | 6 | 0.7448 | 0.7355 | 0.9456 |
 
-Dos advertencias al leer esta tabla:
+El modelo 4 va aparte porque su tarea no es comparable con las otras: solo distingue
+`basura` de `reciclable`, y su clase de interés es la rara (5.7% del test).
+
+| Modelo 4 (binario) | Accuracy | Bal. accuracy | F1 basura | AP basura |
+|---|---|---|---|---|
+| Trivial "todo reciclable" | 0.9427 | 0.5000 | 0.0000 | 0.057 |
+| Con Optuna, `argmax` | 0.9479 | 0.9083 | 0.6552 | 0.7977 |
+| **Con Optuna, umbral calibrado** | **0.9792** | 0.9036 | **0.8182** | 0.7977 |
+
+Dos advertencias al leer estas tablas:
 
 - **Accuracy no es comparable entre 4 y 6 clases**: no son la misma tarea. El AUC macro
   es más comparable, y ahí el mejor sigue siendo el MobileNetV3 de 6 clases (0.9802).
 - **1 punto de accuracy son ~4 imágenes.** El piso de ruido medido de estos
-  experimentos es de **~1.6 puntos** (ver §8), así que diferencias de ese orden entre dos
+  experimentos es de **~1.6 puntos** (ver §9), así que diferencias de ese orden entre dos
   filas no distinguen nada.
 
 El salto grande fue el **transfer learning**: de 0.7708 (mejor CNN desde cero) a 0.8438
@@ -177,7 +207,7 @@ hiperparámetros originales del notebook: adam, lr 1e-3, batch 16, relu, dropout
 | val_accuracy (mejor época) | **0.8249** (ép. 44) | 0.8011 (ép. 38) | −0.024 |
 
 El baseline gana en las cuatro métricas, incluida validación. El análisis de por qué
-está en §8; el resumen es **desajuste de horizonte**: se buscó con 12 épocas y se
+está en §9; el resumen es **desajuste de horizonte**: se buscó con 12 épocas y se
 entrenó con 50.
 
 Reporte completo en `resultados/reporte/`, gráficos en `resultados/graficos/` y
@@ -283,14 +313,137 @@ Comparación con TensorFlow (mismo modelo y protocolo de entrenamiento):
 
 La fila "sin Optuna" es comparación directa. La de "con Optuna" **no lo es**: TensorFlow
 usa 10 trials y `study.best_params`, PyTorch usa 30 trials con el baseline encolado y
-selección por reentrenamiento del top-3 (§8). La ventaja consistente de PyTorch está en
+selección por reentrenamiento del top-3 (§9). La ventaja consistente de PyTorch está en
 **recall macro** (+5 a +9 puntos): reparte más predicciones hacia las clases minoritarias
 en vez de jugar a lo seguro con `azul`. En TensorFlow `verde` se queda en recall 0.566
 (el vidrio se le va al amarillo); aquí llega a 0.842.
 
 ---
 
-## 8. Lo que aprendimos sobre Optuna (la parte más útil para el informe)
+## 8. Modelo 4 — Binario reciclable / basura, 2 clases (2026-08-10)
+
+`binario/TrashNet_PyTorch_Binario_DEFINITIVO.ipynb`. Mismo backbone y mismo protocolo de
+2 fases, con el target colapsado a dos clases: `basura` (solo `trash`) contra
+`reciclable` (las otras cinco).
+
+```
+train        95 basura / 1671 reciclable   (5.4%, ratio 17.6:1)
+validation   20 basura /  357 reciclable
+test         22 basura /  362 reciclable
+```
+
+**El accuracy no sirve como métrica aquí.** Un modelo que siempre diga "reciclable" saca
+**94.27%** en test sin detectar ni una basura. Por eso la métrica de decisión es la
+**average precision (AP) sobre `basura`**, el EarlyStopping monitoriza AP en vez de
+`val_accuracy`, y Optuna optimiza AP. `basura` se define como clase de interés aunque sea
+la minoritaria: si se usara `reciclable`, precision y recall saldrían ~0.98 trivialmente.
+
+Ganador: **trial 21** (propuesto por el TPE) — `256 units, dropout 0.25, lr 9.95e-4,
+adam`. AP en validación 0.8126.
+
+### El resultado principal: calibrar el umbral vale más que Optuna
+
+| Test, clase basura | argmax (0.500) | **umbral calibrado (0.837)** |
+|---|---|---|
+| TP / FP / FN / TN | 19 / 17 / 3 / 345 | **18 / 4 / 4 / 358** |
+| Precision | 0.5278 | **0.8182** |
+| Recall | 0.8636 | 0.8182 |
+| **F1** | 0.6552 | **0.8182** |
+| Accuracy | 0.9479 | 0.9792 |
+| Balanced accuracy | 0.9083 | 0.9036 |
+
+AP en test: **0.7977** con Optuna, 0.7593 sin Optuna.
+
+Calibrar el umbral sobre validación subió el F1 **+0.163**, más de cuatro veces la mejora
+que aportó Optuna (+0.038 de AP). El mecanismo se ve en la matriz: `argmax` producía **17
+falsos positivos** para 19 aciertos; subir el umbral a 0.837 los deja en **4**, a costa de
+un solo verdadero positivo. Se cambian 13 falsos positivos por 1 falso negativo.
+
+Es la lección más transferible del notebook: **con clases desbalanceadas el umbral es un
+hiperparámetro más, y suele ser el que más rinde.** Los modelos 1, 2 y 3 usan `argmax`
+implícitamente y ninguno lo justifica.
+
+### Supera al jerárquico
+
+El modelo 3 ya resolvía esta tarea de forma implícita con su clase `gris`, así que era el
+baseline real a batir:
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| Trivial "todo reciclable" | — | 0.000 | 0.000 |
+| Jerárquico, clase `gris` | 0.6129 | 0.8636 | 0.7170 |
+| **Binario con umbral** | **0.8182** | 0.8182 | **0.8182** |
+
+**+0.101 de F1.** Toda la ventaja está en precision (0.61 → 0.82) a cambio de algo de
+recall. Es decir: el binario deja de usar la clase basura como cajón de sastre, que era el
+problema crónico de `trash` y `gris` en los tres modelos anteriores.
+
+### Evaluación fuera de distribución: el modelo NO generaliza
+
+Las 453 imágenes de `dataset_gd/trash` (Garbage Dataset, CC BY 4.0) no se usaron para
+entrenar ni para calibrar el umbral. Son fotos reales con fondo y contexto, tomadas con
+móviles, frente a las fotos de estudio sobre fondo blanco de TrashNet.
+
+| | Recall sobre basura |
+|---|---|
+| TrashNet test (22 imágenes) | **0.8182** |
+| **Garbage Dataset (453 imágenes)** | **0.1192** (54 de 453) |
+
+**Caída de 70 puntos.** Con `argmax` tampoco mejora (0.1457). Y no es duda del modelo: la
+**mediana de `P(basura)` en GD es 0.0037** — afirma con total confianza que las fotos
+reales de basura son reciclables.
+
+El desglose por resolución descarta la explicación alternativa:
+
+| Grupo | n | Recall | P(basura) media |
+|---|---|---|---|
+| lado menor < 224 px | 136 | 0.0074 | 0.0481 |
+| **lado menor >= 224 px** | **317** | **0.1672** | 0.2166 |
+
+Si el problema fuera la nitidez, el grupo de buena resolución funcionaría. Falla igual.
+**Es cambio de dominio: el modelo aprendió el estudio fotográfico, no el objeto.**
+
+Para el informe esto no es un fracaso, es el hallazgo mejor medido del proyecto:
+
+> Un modelo con F1 0.818 y accuracy 97.9% en su propio test cae a recall 0.119 con fotos
+> reales del mismo tipo de residuo. Los cuatro modelos están evaluados solo dentro de
+> TrashNet, y este experimento cuantifica hasta dónde se pueden extrapolar sus números:
+> prácticamente nada fuera del dominio de estudio.
+
+Es una comprobación que la mayoría de trabajos sobre TrashNet no hace, y aquí está
+respaldada con 453 imágenes y un control que descarta la calidad de imagen.
+
+### Por qué se usó la carpeta `original` de GD y no las `standardized_*`
+
+El dataset se descarga con tres variantes. Las dos `standardized_*` hacen las imágenes
+cuadradas con **padding letterbox** gris `(114,114,114)`, y en algunas blanco. TrashNet
+nunca tiene esas barras, así que evaluar con ellas metería un artefacto visual presente
+**solo** en la clase de basura y sería imposible saber si el modelo falla por el objeto o
+por el relleno. Con `original`, ambos conjuntos reciben el mismo trato: aspect ratio
+nativo → `Resize((224,224))`. Está documentado en `dataset_gd/README.md`.
+
+### Límites de este modelo
+
+- **95 imágenes de basura en train.** Puede estar memorizándolas en vez de aprender la
+  categoría.
+- **20 en validación.** El umbral 0.837 se calibró sobre 20 ejemplos: un acierto o fallo
+  mueve el recall 5 puntos, así que el umbral es ruidoso. Una alternativa más sólida sería
+  validación cruzada de 5 folds solo para elegirlo.
+- **22 en test.** Todas las métricas de la clase basura arrastran esa incertidumbre. Por
+  eso la evaluación sobre GD, con 453 imágenes, es la evidencia más fuerte del notebook
+  aunque solo mida recall.
+
+### Nota sobre el notebook
+
+La corrida del 2026-08-10 (1h42m) **se cerró sin guardar**, así que el `.ipynb` no tiene
+outputs. Los pesos y las 10 figuras de `binario/predicciones/` sí quedaron, y todas las
+cifras de esta sección se reconstruyeron cargando `trashnet_binario_optuna.pt` y
+re-infiriendo sobre validación, test y GD. Lo único no recuperable es la tabla de trials
+de Optuna y las curvas de entrenamiento. Al re-ejecutar, **guardar el notebook**.
+
+---
+
+## 9. Lo que aprendimos sobre Optuna (la parte más útil para el informe)
 
 Optuna ganó en dos de los tres modelos y perdió en uno. El patrón es consistente y
 explicable, y vale más contarlo así que presentar un número de accuracy.
@@ -350,6 +503,16 @@ mejora. Vale para el +0.26 de TensorFlow y también para el +1.56 del modelo 3 �
 caso el argumento fuerte no es el accuracy solo, es que gana en las cinco métricas y
 también en validación con el mismo criterio con que se eligió.
 
+### Y aun así, el umbral rinde más que la búsqueda
+
+En el modelo 4, con la búsqueda ya corregida, Optuna aportó +0.038 de AP y **calibrar el
+umbral aportó +0.163 de F1**. Cuatro veces más, y sin entrenar nada.
+
+Conviene tenerlo presente antes de invertir una hora en 30 trials: en problemas
+desbalanceados, el orden de rentabilidad suele ser **(1) elegir bien la métrica, (2)
+calibrar el umbral, (3) buscar hiperparámetros**. Los modelos 1, 2 y 3 se saltaron los dos
+primeros pasos.
+
 ### Cuál de los tres arreglos sirvió
 
 En el modelo 3, **el que movió la aguja fue subir de 10 a 30 trials**. El reentrenamiento
@@ -359,7 +522,7 @@ el ranking aguanta en vez de suponerlo.
 
 ---
 
-## 9. Decisiones y trampas (leer antes de tocar el código)
+## 10. Decisiones y trampas (leer antes de tocar el código)
 
 **Sin scikit-learn.** El env no lo tiene, y el notebook original ya calculaba las
 métricas a mano con NumPy por eso. Todo lo demás mantiene ese enfoque: matriz de
@@ -415,6 +578,30 @@ métrica final quedaría contaminada por la selección de hiperparámetros.
 comparables entre sí. Los notebooks 2 y 3 crean su study **en memoria** justamente para
 no contaminarlo.
 
+**Accuracy bajo desbalance fuerte.** En el modelo 4 el 94.3% del test es `reciclable`:
+el modelo trivial que siempre dice esa clase saca 0.9427 de accuracy y no detecta nada.
+Cualquier accuracy que se reporte en ese notebook hay que compararla contra ese número, no
+contra 0.5. La **balanced accuracy** (media de los recalls por clase) sí vale: el trivial
+saca 0.5.
+
+**AUC contra AP.** Con pocos positivos la curva ROC es engañosamente optimista, porque la
+tasa de falsos positivos apenas se mueve aunque haya muchos falsos positivos en términos
+absolutos. La curva **precision-recall** y su AP sí lo reflejan. En el modelo 4 la AUC sale
+muy por encima de la AP y no es una contradicción: es el desbalance. Reportar solo la AUC
+en un problema así es engañoso.
+
+**El umbral no es 0.5 por defecto.** Usar `argmax` equivale a fijar el umbral en 0.5 sin
+justificarlo. Con clases desbalanceadas el óptimo casi nunca está ahí. Se calibra **sobre
+validación** y solo entonces se evalúa test. Ver §9.
+
+**Cambio de dominio al mezclar datasets.** Las imágenes de TrashNet son objetos aislados
+sobre fondo blanco de estudio; casi cualquier dataset externo de residuos son fotos reales
+con fondo y contexto. Si se mezclan como clases distintas, el modelo aprende
+"fondo blanco = clase A, fondo con contexto = clase B" y da métricas excelentes sin mirar
+el objeto. Por eso `dataset_gd/` **solo se usa para evaluar**, nunca para entrenar. Si
+algún día se entrena con datos externos, hay que hacer la ablación de fondo antes de
+creerse el resultado.
+
 **Desbalance del dataset.** `paper` tiene 415 imágenes de train y `trash` solo 95, así
 que accuracy premia ignorar `trash`. Por eso en el modelo 1 la métrica por defecto es
 macro-AUC, y en los modelos 2 y 3 se usan `class_weight` en la loss. En las 4 clases del
@@ -422,17 +609,25 @@ modelo 3 el desbalance es peor todavía (`gris` = 95 contra `azul` = 697).
 
 ---
 
-## 10. Qué sigue
+## 11. Qué sigue
 
 En orden de utilidad:
 
-1. **Atacar la confusión vidrio ↔ amarillo (o glass ↔ plastic ↔ metal).** Es donde se
-   pierde más de la mitad del accuracy restante en los tres modelos, y ninguna
+1. **Cerrar la brecha de dominio, que ahora está medida (§8).** Es lo más importante que
+   queda: hoy sabemos que el mejor modelo cae de recall 0.818 a 0.119 con fotos reales.
+   Tres caminos, de menos a más esfuerzo: (a) augmentation que simule el mundo real
+   —fondos aleatorios, recortes, desenfoque, cambios fuertes de iluminación—; (b)
+   entrenar dentro de GD, que tiene 12.259 imágenes en 10 clases y dominio consistente;
+   (c) fotografiar 100-200 objetos de rechazo en las mismas condiciones que TrashNet, que
+   es la única forma de conseguir negativos en el dominio original y daría datos propios
+   para el informe.
+2. **Atacar la confusión vidrio ↔ amarillo (o glass ↔ plastic ↔ metal).** Es donde se
+   pierde más de la mitad del accuracy restante en los modelos multiclase, y ninguna
    reagrupación de clases lo resuelve (§7). Ideas: aumento de datos con más variación de
    color/brillo/reflejos, un backbone más grande (MobileNetV3**Large** o ResNet18), o
    entrenar un clasificador binario dedicado solo a distinguir vidrio de plástico/metal
    sobre las imágenes que el modelo principal manda a esas dos clases.
-2. **Arreglar la búsqueda del modelo 1 con lo aprendido en §8.** Hoy es el único de los
+3. **Arreglar la búsqueda del modelo 1 con lo aprendido en §9.** Hoy es el único de los
    tres donde Optuna pierde, y ya sabemos por qué. Los tres cambios son barajos:
 
    ```bash
@@ -444,17 +639,18 @@ En orden de utilidad:
 
    Falta añadir a los scripts el `enqueue_trial` del baseline y el reentrenamiento del
    top-k, que en el notebook 3 ya están implementados y se pueden copiar de ahí.
-3. **Corregir el notebook jerárquico de TensorFlow**, que sigue con 10 trials y por lo
-   tanto con random search (§8, punto 1). Es de Tomás; conviene avisarle. Con eso la
+4. **Corregir el notebook jerárquico de TensorFlow**, que sigue con 10 trials y por lo
+   tanto con random search (§9, punto 1). Es de Tomás; conviene avisarle. Con eso la
    comparación entre frameworks volvería a ser directa en las dos filas.
-4. **Re-ejecutar el modelo 2 en GPU**, que quedó corrido en CPU.
-5. **Varias semillas por configuración** si hay tiempo. Es la única forma de bajar el piso
+5. **Re-ejecutar el modelo 2 en GPU**, que quedó corrido en CPU, y **re-ejecutar y
+   guardar el modelo 4**, cuyo notebook quedó sin outputs.
+6. **Varias semillas por configuración** si hay tiempo. Es la única forma de bajar el piso
    de ruido de 1.6 puntos y poder afirmar diferencias chicas con algo de rigor. 3 semillas
    × el modelo final son ~15 min.
 
 ---
 
-## 11. Comandos de referencia
+## 12. Comandos de referencia
 
 ```bash
 conda activate frameworks-ia
@@ -471,9 +667,9 @@ python entrenar_mejor.py --epocas 50 --patience 10
 python entrenar_mejor.py --sin-optuna
 ```
 
-Modelos 2 y 3: son notebooks, se ejecutan de arriba a abajo con el kernel de
-`frameworks-ia`. El modelo 3 tarda **~1 hora** en la GTX 1650 SUPER (Parte A ~6 min, 30
-trials ~35 min, top-3 ~15 min). Si hay que recortar, `TOP_K = 2` ahorra ~5 min y
+Modelos 2, 3 y 4: son notebooks, se ejecutan de arriba a abajo con el kernel de
+`frameworks-ia`. Los modelos 3 y 4 tardan **~1 hora** cada uno en la GTX 1650 SUPER
+(Parte A ~6 min, 30 trials ~35 min, top-3 ~15 min). Si hay que recortar, `TOP_K = 2` ahorra ~5 min y
 `OPTUNA_TRIALS = 20` unos 12 min más, aunque con 20 trials el TPE se queda con solo 10
 informados.
 
