@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TrashNet Tester</string>
+    <string name="title_activity_main">TrashNet Tester</string>
+    <string name="package_name">cl.equipodinamita.trashnettester</string>
+    <string name="custom_url_scheme">cl.equipodinamita.trashnettester</string>
+</resources>

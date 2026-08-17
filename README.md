@@ -16,6 +16,19 @@ Clasificador de imágenes de residuos en **6 categorías**:
 - plastic
 - trash
 
+Además del clasificador de 6 clases, el proyecto creció con **dos variantes más
+del target** y una **app móvil** que corre los tres modelos en el teléfono:
+
+| Modelo | Clases | Dónde está |
+|---|---|---|
+| MobileNetV3 (material) | 6: cardboard, glass, metal, paper, plastic, trash | `PyTorch/`, `tensorflow/` |
+| Jerárquico (contenedor) | 4: amarillo, azul, gris, verde | `PyTorch/jerarquico/` |
+| Binario | 2: basura, reciclable (con umbral calibrado) | `PyTorch/binario/` |
+
+El detalle de entrenamiento, métricas y decisiones de la rama PyTorch está en
+[`PyTorch/CONTEXT.md`](PyTorch/CONTEXT.md). La app móvil está en
+[`trashnet-tester/`](trashnet-tester/README.md).
+
 ---
 
 # Archivos entregados
@@ -191,6 +204,70 @@ Cada notebook incluye una sección para cargar una imagen y obtener:
 - clase predicha
 - probabilidad/confianza
 - visualización de la imagen
+
+---
+
+# Exportación a ONNX
+
+Los tres modelos PyTorch (las variantes `_optuna`, que son las de mejor
+desempeño) se exportan a ONNX para poder correrlos fuera de Python:
+
+```bash
+conda activate frameworks-ia
+pip install onnx onnxruntime onnxscript      # solo la primera vez
+python scripts/export_onnx.py                # genera onnx/
+cd scripts && python verify_onnx.py          # contrasta ONNX vs PyTorch
+```
+
+`export_onnx.py` deja en `onnx/` seis archivos: un `.onnx` y un `.labels.json`
+por modelo. El `.labels.json` lleva las clases, el tamaño de entrada, la
+normalización y —en el binario— el umbral calibrado. **La app lee todo de ahí, no
+hardcodea ninguno de esos valores**, así que si se reentrena un modelo alcanza con
+regenerar los archivos.
+
+`verify_onnx.py` compara los logits del ONNX contra los del PyTorch original sobre
+`imagenes_a_test/`. Tiene que dar `[OK]` en todas las líneas.
+
+---
+
+# App móvil (Ionic + ONNX Runtime Web)
+
+`trashnet-tester/` es una app Ionic/Angular que corre los **tres modelos
+on-device**, sin llamadas de red: se saca o se elige una foto y se obtiene la
+clase predicha con su confianza.
+
+```bash
+cd trashnet-tester
+npm install
+npm start                # navegador, http://localhost:8100
+
+source android-env.sh    # JDK y SDK están en $HOME, no en el sistema
+npm run android:apk      # APK de debug (~29 MB)
+```
+
+Puntos a tener en cuenta:
+
+- **La regla de decisión no es la misma para los tres modelos.** Los dos
+  multiclase usan `argmax`; el binario usa el **umbral calibrado 0.837**, que es
+  lo que sube su F1 de 0.655 a 0.818 (ver `PyTorch/CONTEXT.md` §8).
+- **El preprocesamiento replica exactamente el `eval_tf` del entrenamiento.** Fue
+  necesario reimplementar el resize de Pillow en TypeScript, porque el de OpenCV
+  llegaba a cambiar la clase predicha.
+- **Hay un autotest** que corre `imagenes_a_test/` y compara contra las
+  predicciones de los modelos PyTorch originales, tanto en la app (botón "Correr
+  autotest") como en Node (`npm run autotest`). Da **6/6**, verificado en
+  navegador y en teléfono Android.
+
+Todo el detalle —incluidos los desvíos respecto del plan original y los errores
+que solo aparecen probando en un navegador real— está en
+[`trashnet-tester/README.md`](trashnet-tester/README.md). El plan que se siguió
+para construirla está en [`PLAN_APP_IONIC.md`](PLAN_APP_IONIC.md).
+
+> **Ojo con las predicciones de la app.** Está medido que estos modelos no
+> generalizan fuera del estudio fotográfico de TrashNet: el recall del binario
+> cae de 0.818 a 0.119 con fotos reales de celular. Una predicción mala con una
+> foto propia es el comportamiento esperado, no necesariamente un bug. El
+> autotest sirve justo para distinguir los dos casos.
 
 ---
 

@@ -1,0 +1,143 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>TrashNet Tester</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  <ion-header collapse="condense">
+    <ion-toolbar>
+      <ion-title size="large">TrashNet Tester</ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-subtitle>Modelo</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-select
+        [(ngModel)]="modeloSeleccionado"
+        [compareWith]="compararIds"
+        interface="popover"
+        label="Modelo"
+        labelPlacement="stacked"
+      >
+        <ion-select-option *ngFor="let m of modelos" [value]="m">
+          {{ m.titulo }}
+        </ion-select-option>
+      </ion-select>
+      <p class="descripcion">{{ modeloSeleccionado.descripcion }}</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-grid class="ion-no-padding">
+    <ion-row>
+      <ion-col size="6">
+        <ion-button expand="block" (click)="tomarFoto()">
+          <ion-icon name="camera-outline" slot="start"></ion-icon>
+          Cámara
+        </ion-button>
+      </ion-col>
+      <ion-col size="6">
+        <ion-button expand="block" fill="outline" (click)="elegirDeGaleria()">
+          <ion-icon name="images-outline" slot="start"></ion-icon>
+          Galería
+        </ion-button>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+
+  <img *ngIf="imagenUrl" [src]="imagenUrl" class="preview" alt="Imagen a clasificar" />
+
+  <ng-container *ngIf="imagenUrl">
+    <ion-button expand="block" (click)="predecir()" [disabled]="cargando">
+      Predecir con {{ modeloSeleccionado.titulo }}
+    </ion-button>
+    <ion-button expand="block" fill="outline" (click)="predecirTodos()" [disabled]="cargando">
+      Comparar los 3 modelos
+    </ion-button>
+  </ng-container>
+
+  <div *ngIf="cargando" class="ion-text-center ion-padding">
+    <ion-spinner></ion-spinner>
+    <p>{{ estado }}</p>
+  </div>
+
+  <ion-note color="danger" *ngIf="error">{{ error }}</ion-note>
+
+  <ion-card *ngFor="let fila of filas">
+    <ion-card-header>
+      <ion-card-subtitle>{{ fila.modelo.titulo }}</ion-card-subtitle>
+      <ion-card-title>{{ fila.resultado.clase }}</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <h2 class="confianza">{{ porcentaje(fila.resultado.confianza) }}</h2>
+      <p class="regla">{{ fila.resultado.regla }}</p>
+
+      <ion-list lines="none">
+        <ion-item *ngFor="let p of fila.resultado.probabilidades">
+          <ion-label>
+            <div class="fila-clase">
+              <span>{{ p.clase }}</span>
+              <span>{{ porcentaje(p.prob) }}</span>
+            </div>
+            <ion-progress-bar [value]="p.prob"></ion-progress-bar>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+
+      <p class="tiempos">
+        preproceso {{ fila.resultado.msPreproceso.toFixed(0) }} ms ·
+        inferencia {{ fila.resultado.msInferencia.toFixed(0) }} ms
+      </p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-subtitle>Autotest</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <p class="descripcion">
+        Corre las imágenes de <code>imagenes_a_test/</code> y compara contra la
+        predicción de los modelos PyTorch originales.
+      </p>
+      <ion-button expand="block" fill="outline" (click)="correrAutotest()" [disabled]="cargando">
+        Correr autotest
+      </ion-button>
+
+      <ng-container *ngIf="autotest.length">
+        <h3 class="resumen" [class.mal]="autotestOk !== autotest.length">
+          {{ autotestOk }} / {{ autotest.length }} coinciden
+        </h3>
+        <ion-list lines="full">
+          <ion-item *ngFor="let r of autotest">
+            <ion-icon
+              slot="start"
+              [name]="r.ok ? 'checkmark-circle-outline' : 'close-circle-outline'"
+              [color]="r.ok ? 'success' : 'danger'"
+            ></ion-icon>
+            <ion-label class="ion-text-wrap">
+              <h3>{{ r.modelo }} · {{ r.imagen }}</h3>
+              <p>
+                PyTorch: {{ r.claseEsperada }} ({{ porcentaje(r.confianzaEsperada) }}) ·
+                app: {{ r.claseObtenida }} ({{ porcentaje(r.confianzaObtenida) }})
+              </p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ng-container>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card color="warning" *ngIf="filas.length">
+    <ion-card-content>
+      <strong>Ojo con las fotos reales.</strong> Estos modelos se entrenaron con
+      fotos de estudio sobre fondo blanco (TrashNet). Medido en un dataset
+      externo de fotos de celular, el recall del binario cae de 0.818 a 0.119.
+      Una predicción mala con una foto tuya es el comportamiento esperado, no
+      necesariamente un bug de la app (ver PyTorch/CONTEXT.md §8).
+    </ion-card-content>
+  </ion-card>
+</ion-content>

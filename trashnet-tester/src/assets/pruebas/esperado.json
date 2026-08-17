@@ -1,0 +1,42 @@
+{
+  "generado_por": "scripts/generar_autotest.py",
+  "referencia": "PyTorch (los .pt de _optuna), pipeline eval_tf",
+  "casos": [
+    {
+      "modelo": "trashnet_mobilenetv3",
+      "imagen": "assets/pruebas/test_1.jpeg",
+      "clase": "glass",
+      "confianza": 0.643556
+    },
+    {
+      "modelo": "trashnet_mobilenetv3",
+      "imagen": "assets/pruebas/test_2.jpeg",
+      "clase": "paper",
+      "confianza": 0.655398
+    },
+    {
+      "modelo": "trashnet_jerarquico",
+      "imagen": "assets/pruebas/test_1.jpeg",
+      "clase": "verde",
+      "confianza": 0.595182
+    },
+    {
+      "modelo": "trashnet_jerarquico",
+      "imagen": "assets/pruebas/test_2.jpeg",
+      "clase": "azul",
+      "confianza": 0.999829
+    },
+    {
+      "modelo": "trashnet_binario",
+      "imagen": "assets/pruebas/test_1.jpeg",
+      "clase": "reciclable",
+      "confianza": 0.999781
+    },
+    {
+      "modelo": "trashnet_binario",
+      "imagen": "assets/pruebas/test_2.jpeg",
+      "clase": "reciclable",
+      "confianza": 0.999822
+    }
+  ]
+}

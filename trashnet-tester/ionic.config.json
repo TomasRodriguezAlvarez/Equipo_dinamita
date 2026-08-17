@@ -1,0 +1,7 @@
+{
+  "name": "trashnet-tester",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
