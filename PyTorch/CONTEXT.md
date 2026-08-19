@@ -85,10 +85,22 @@ PyTorch/
 │   ├── modelos/                                  trashnet_jerarquico_{sin_optuna,optuna}.pt
 │   └── predicciones/                             jer_*.png
 │
-└── binario/                                      MODELO 4, autocontenido
-    ├── TrashNet_PyTorch_Binario_DEFINITIVO.ipynb
-    ├── modelos/                                  trashnet_binario_{sin_optuna,optuna}.pt
-    └── predicciones/                             bin_*.png
+├── binario/                                       MODELO 4, autocontenido
+│   ├── TrashNet_PyTorch_Binario_DEFINITIVO.ipynb
+│   ├── modelos/                                  trashnet_binario_{sin_optuna,optuna}.pt
+│   └── predicciones/                             bin_*.png
+│
+└── scriptsPython/                                 SEGUNDA ENTREGA — ver §13
+    ├── comun/utils.py                            arquitectura, entrenamiento, métricas, gráficos
+    ├── dataset/preparar_dataset.py               separación train/validation/test
+    ├── modelos/
+    │   ├── mobilenetv3/entrenar.py               modelo 2 (6 clases) como script
+    │   ├── jerarquico/entrenar.py                modelo 3 (4 clases) como script
+    │   └── binario/entrenar.py                   modelo 4 (2 clases, desequilibrado) como script
+    ├── consumo/predecir.py                        script de consumo independiente
+    ├── camara/capturar_camara.py                  clasificación en vivo con OpenCV
+    ├── pesos/                                      .pt generados por los `entrenar.py`
+    └── resultados/graficos, matriz_de_confusion, reporte/
 ```
 
 Y en la raíz del repo, fuera de `dataset/` a propósito:
@@ -676,3 +688,120 @@ informados.
 Si una corrida de los scripts se cae, no se pierde nada: el study vive en
 `optuna/study.db` y relanzar el mismo comando continúa donde quedó. Los notebooks, en
 cambio, tienen el study en memoria: si se interrumpe la búsqueda hay que repetirla.
+
+---
+
+## 13. `scriptsPython/` — segunda entrega (2026-08-18)
+
+### Por qué existe
+
+La pauta de la segunda entrega prohíbe Jupyter como entregable ("el documento
+universal se llama código o script, no jupyters") y agrega tres requisitos nuevos:
+separar la obtención del dataset del entrenamiento, un script de consumo
+independiente, y uso de OpenCV para cámara. `scriptsPython/` es la traducción de los
+notebooks 2, 3 y 4 (§6, §7, §8) a scripts de línea de comandos, más lo nuevo que la
+pauta exige. El modelo 1 no se tocó: ya tenía scripts en `scripts/` desde antes.
+
+Los notebooks originales **no se borraron**: quedan como referencia del desarrollo y
+del razonamiento detrás de cada decisión (documentado en §6-§9). El entregable pasa a
+ser el contenido de `scriptsPython/`.
+
+**Alcance:** existe la carpeta gemela `tensorflow/scriptsPython/`, con la misma
+estructura, para los tres notebooks de esa rama. Ojo: **esa parte es de otro
+integrante del equipo** (§7); se generó a pedido en la misma sesión, pero conviene
+que su dueño la revise antes de darla por definitiva. Las diferencias entre ambas
+ramas están documentadas en `tensorflow/scriptsPython/README.md` y son deliberadas
+(TensorFlow mantiene los 10-15 trials de Optuna del notebook original, sin las
+correcciones de §9, y su modelo binario sí incorpora `dataset_gd/` al entrenamiento).
+
+### Diseño
+
+Los tres modelos comparten arquitectura (`TrashNetMobileNetV3`), bucle de
+entrenamiento y métricas manuales (sin scikit-learn, igual que los notebooks). En vez
+de triplicar ese código como estaban los notebooks, vive una sola vez en
+`comun/utils.py` y cada `modelos/<nombre>/entrenar.py` solo define lo que cambia: el
+remapeo de clases (`target_transform` para jerárquico y binario), los pesos de clase,
+y en el caso del binario, que la métrica a optimizar es average precision en vez de
+accuracy (`metrica_fn` en `u.entrenar`).
+
+La metodología de Optuna corregida (§9: baseline encolado como trial 0, top-K
+reentrenado a presupuesto completo) quedó generalizada en
+`u.reentrenar_topk`, para no repetirla a mano en los tres `entrenar.py`.
+
+### Uso
+
+```bash
+conda activate frameworks-ia
+# opcional, para camara/capturar_camara.py:
+pip install opencv-python
+
+# 1. Preparar el dataset (una sola vez; separado del entrenamiento)
+cd PyTorch/scriptsPython/dataset
+python preparar_dataset.py
+
+# 2. Entrenar cada modelo (Parte A + búsqueda Optuna + evaluación, todo en un run)
+cd ../modelos/mobilenetv3 && python entrenar.py
+cd ../jerarquico       && python entrenar.py
+cd ../binario          && python entrenar.py
+# --sin-optuna entrena solo el baseline, sin búsqueda
+
+# 3. Consumir un modelo ya entrenado
+cd ../../consumo
+python predecir.py --modelo ../pesos/binario_optuna.pt --imagen foto.jpg --umbral 0.837
+
+# 4. Clasificación en vivo desde la cámara
+cd ../camara
+python capturar_camara.py --modelo ../pesos/mobilenetv3_optuna.pt
+```
+
+### Diferencias deliberadas frente a los notebooks
+
+- El umbral del modelo binario se recalibra dentro de `entrenar.py` (no se guarda en
+  el `.pt`); `predecir.py` y `capturar_camara.py` lo reciben como argumento
+  `--umbral`, porque es una decisión de producto (§8), no un hiperparámetro del modelo.
+- `evaluar()` en `comun/utils.py` generaliza `correr_epoca` (modelos 1-3) y la función
+  `evaluar` del notebook binario en una sola versión que siempre devuelve
+  probabilidades, y `entrenar()` acepta `metrica_fn` para poder monitorizar accuracy o
+  AP con el mismo bucle.
+- La Parte D (evaluación contra `dataset_gd/`) se saltea sola si esa carpeta no existe,
+  igual que en el notebook original.
+- **Los conteos por clase filtran por extensión** (`u.contar_imagenes`). Los notebooks
+  y `scripts/trashnet_comun.py` usan `len(os.listdir(...))`, que cuenta cualquier
+  archivo suelto: hoy hay un **`hola.md` dentro de `dataset/train/metal/`**, así que
+  esos conteos dicen 288 imágenes donde `ImageFolder` carga 287. El efecto en los
+  pesos de clase es chico (~0.003 en `metal`) pero silencioso, y crece si aparecen más
+  archivos sueltos. **`scripts/trashnet_comun.py` NO se corrigió a propósito**: sus
+  resultados están documentados en §5 como reproducibles al último decimal, y cambiar
+  los pesos alteraría esos números.
+
+### Verificación hecha (2026-08-18)
+
+No se pudo ejecutar nada de punta a punta desde la sesión (no había acceso al env
+`frameworks-ia`: sin torch, sin TensorFlow, sin OpenCV). Lo que **sí** se verificó:
+
+- Las métricas manuales de `comun/utils.py` se contrastaron contra scikit-learn con
+  datos sintéticos y **coinciden hasta 1e-9**: matriz de confusión, precision/recall/F1
+  por clase, accuracy, balanced accuracy, macro-F1, AUC macro OVR, average precision y
+  las curvas ROC/PR — incluido el caso borde de scores empatados, donde una AP mal
+  implementada se rompe. Importa porque al unificar los tres notebooks se reemplazó la
+  `roc_curve` de bucle por la versión vectorizada del notebook binario.
+- Los remapeos de clase (`ORIGINAL_TO_CONTAINER = [1,3,0,1,0,2]` y
+  `ORIGINAL_TO_BINARIO = [1,1,1,1,1,0]`) coinciden con los de los notebooks, en las dos
+  ramas.
+- `calibrar_umbral` devuelve efectivamente el umbral de F1 máximo, y ese F1 coincide
+  con el que sklearn calcula en ese mismo umbral.
+- Análisis estático: `pyflakes` limpio, y chequeo por AST de que toda llamada a
+  `u.*` y a funciones locales existe y respeta su firma.
+
+Sigue **sin probarse**: una corrida real de entrenamiento, la carga de un `.pt`/`.keras`
+en `predecir.py`, y `capturar_camara.py` con una cámara.
+
+### Pendiente
+
+- Los pesos ya entrenados de los notebooks (`modelos/`, `jerarquico/modelos/`,
+  `binario/modelos/`) no se movieron ni se re-entrenaron. Si se necesitan los mismos
+  números para el informe sin volver a correr ~1h por modelo, se pueden copiar esos
+  `.pt` a `scriptsPython/pesos/` — las claves del diccionario coinciden.
+- `capturar_camara.py` no se probó con una cámara real en esta sesión (sin hardware
+  disponible); si falla, revisar primero el índice de `--camara` y que `opencv-python`
+  esté instalado en `frameworks-ia`.
