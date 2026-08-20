@@ -222,7 +222,8 @@ resultado en pantalla, con la lógica de decisión correcta por modelo.
 - [x] Fase 2: proyecto Ionic creado en `trashnet-tester/`, dependencias
       instaladas, modelos copiados a `src/assets/models/`.
 - [x] Fase 3: pipeline de preprocesamiento (resize 224×224 sin crop + normalize
-      con mean/std leídos del `labels.json`). **Sin OpenCV.js** — ver más abajo.
+      con mean/std leídos del `labels.json`), **con OpenCV.js** — pero el resize
+      no es `cv.resize`, ver más abajo.
 - [x] Fase 4: inferencia con `onnxruntime-web` + lógica de decisión correcta por
       modelo (argmax vs. umbral calibrado del binario).
 - [x] Fase 5: validado contra `imagenes_a_test/`, **6/6 coincide con PyTorch**,
@@ -230,21 +231,24 @@ resultado en pantalla, con la lógica de decisión correcta por modelo.
       sin navegador, con un decodificador JPEG algo distinto).
 - [x] Fase 5: proyecto Android agregado y APK de debug compilando
       (`npm run android:apk`). JDK 21 y Android SDK instalados en `$HOME`.
-- [ ] Fase 5: **pendiente** — instalar el APK en un teléfono, correr el autotest
-      ahí y probar con fotos de la cámara. Requiere el teléfono a mano;
-      instrucciones en `trashnet-tester/README.md`.
+- [x] Fase 5: APK instalado en un teléfono real y probado con fotos de la
+      cámara (2026-08-20). El autotest **dentro de la app** llegó a correr ahí,
+      pero después sus botones se retiraron de la pantalla junto con otros
+      textos técnicos; en escritorio queda `npm run autotest`. Ver "La pantalla"
+      en `trashnet-tester/README.md`.
 
 ## Desvíos respecto de lo que decía este plan
 
 Documentados en detalle en `trashnet-tester/README.md`:
 
-1. **El resize no usa OpenCV.js.** OpenCV no tiene bilineal con antialias, que es
-   lo que hace `transforms.Resize((224,224))` sobre una imagen PIL. Con
-   `cv.INTER_AREA` (la mejor opción de OpenCV) el modelo jerárquico predecía
-   `amarillo` en vez de `verde` sobre `test 1.jpeg`. Se reimplementó el
-   `Resample.c` de Pillow en `src/app/servicios/resample.ts`: diferencia máxima
-   1/255 sobre el 0.076% de los píxeles, y las 6 predicciones coinciden. OpenCV.js
-   quedó sin uso y se sacó (11 MB menos).
+1. **El resize no es un `cv.resize`.** OpenCV no tiene bilineal con antialias,
+   que es lo que hace `transforms.Resize((224,224))` sobre una imagen PIL. Con
+   `cv.INTER_AREA` (la mejor opción directa de OpenCV) el modelo jerárquico
+   predice `amarillo` en vez de `verde` sobre `test 1.jpeg`. El resample de
+   Pillow es separable y lineal, así que se le pasan sus matrices de
+   coeficientes a `cv.gemm`: el resize lo ejecuta OpenCV y el resultado coincide
+   con torchvision (máx 1/255 sobre el 0.08% de los píxeles, 6/6). La app trae
+   los tres pipelines seleccionables para poder comparar en vivo.
 2. **Opset 18 en vez de 17** en `scripts/export_onnx.py`: pedir 17 hace fallar al
    version converter de `onnx`.
 3. **`scripts/export_onnx.py` estaba roto**: asumía que los `.pt` eran un
@@ -255,3 +259,10 @@ Documentados en detalle en `trashnet-tester/README.md`:
    navegador (`wasmPaths` tiene que ser URL absoluta; el bundle por defecto pide
    el `.wasm` de JSEP): detalle en `trashnet-tester/README.md`. Anticipan el
    riesgo de WASM en WebView que este plan ya listaba.
+6. **OpenCV.js se carga como asset, no como import** — son 13 MB y no tienen por
+   qué descargarse si el usuario se queda en el pipeline sin OpenCV. El APK pasó
+   de ~29 MB a ~34 MB.
+7. **La UI quedó más chica que la que pedía la Fase 4/5**: se retiraron el
+   autotest, la advertencia de fotos reales y la línea con la regla de decisión.
+   La lógica no cambió — el binario sigue usando el umbral 0.837 —, solo dejó de
+   mostrarse en pantalla.

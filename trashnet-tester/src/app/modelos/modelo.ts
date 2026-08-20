@@ -7,6 +7,8 @@
  * se reentrena un modelo y cambia alguno de esos valores, la app lo toma solo.
  */
 
+import { ModoPreproceso } from '../servicios/opencv-pipeline';
+
 /** Contenido de un archivo `*.labels.json` generado por `scripts/export_onnx.py`. */
 export interface EtiquetasModelo {
   clases: string[];
@@ -60,9 +62,16 @@ export interface ProbabilidadClase {
 
 export interface Resultado {
   clase: string;
+  /** Con qué implementación de preprocesamiento se obtuvo. */
+  modo: ModoPreproceso;
   confianza: number;
   probabilidades: ProbabilidadClase[];
-  /** Cómo se decidió la clase, para que se vea en pantalla qué regla se aplicó. */
+  /**
+   * Cómo se decidió la clase (umbral calibrado o argmax). Ya no se muestra en
+   * pantalla: se sacó por pedido, para que la app no tenga texto técnico. Se
+   * sigue calculando porque documenta la decisión; para volver a mostrarlo
+   * alcanza con reponer el `<p class="regla">` en `home.page.html`.
+   */
   regla: string;
   msPreproceso: number;
   msInferencia: number;

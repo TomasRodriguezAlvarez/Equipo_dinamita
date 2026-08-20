@@ -230,7 +230,7 @@ regenerar los archivos.
 
 ---
 
-# App móvil (Ionic + ONNX Runtime Web)
+# App móvil (Ionic + OpenCV.js + ONNX Runtime Web)
 
 `trashnet-tester/` es una app Ionic/Angular que corre los **tres modelos
 on-device**, sin llamadas de red: se saca o se elige una foto y se obtiene la
@@ -242,7 +242,7 @@ npm install
 npm start                # navegador, http://localhost:8100
 
 source android-env.sh    # JDK y SDK están en $HOME, no en el sistema
-npm run android:apk      # APK de debug (~29 MB)
+npm run android:apk      # APK de debug (~34 MB)
 ```
 
 Puntos a tener en cuenta:
@@ -250,13 +250,17 @@ Puntos a tener en cuenta:
 - **La regla de decisión no es la misma para los tres modelos.** Los dos
   multiclase usan `argmax`; el binario usa el **umbral calibrado 0.837**, que es
   lo que sube su F1 de 0.655 a 0.818 (ver `PyTorch/CONTEXT.md` §8).
-- **El preprocesamiento replica exactamente el `eval_tf` del entrenamiento.** Fue
-  necesario reimplementar el resize de Pillow en TypeScript, porque el de OpenCV
-  llegaba a cambiar la clase predicha.
+- **El preprocesamiento replica exactamente el `eval_tf` del entrenamiento**, y
+  lo hace con **OpenCV.js**. El `cv.resize` directo no sirve: OpenCV no tiene un
+  bilineal con antialias como el de torchvision, y con `INTER_AREA` el modelo
+  jerárquico cambia su predicción sobre `test 1.jpeg`. Como el resample de
+  Pillow es separable y lineal, sus matrices de coeficientes se multiplican con
+  `cv.gemm`: el resize lo ejecuta OpenCV sin perder la equivalencia. La app trae
+  **tres pipelines seleccionables** para poder comparar.
 - **Hay un autotest** que corre `imagenes_a_test/` y compara contra las
-  predicciones de los modelos PyTorch originales, tanto en la app (botón "Correr
-  autotest") como en Node (`npm run autotest`). Da **6/6**, verificado en
-  navegador y en teléfono Android.
+  predicciones de los modelos PyTorch originales (`npm run autotest`). Da **6/6**
+  con los dos pipelines fieles al entrenamiento y **5/6** con `cv.resize`,
+  verificado en navegador y en teléfono Android.
 
 Todo el detalle —incluidos los desvíos respecto del plan original y los errores
 que solo aparecen probando en un navegador real— está en
@@ -267,7 +271,8 @@ para construirla está en [`PLAN_APP_IONIC.md`](PLAN_APP_IONIC.md).
 > generalizan fuera del estudio fotográfico de TrashNet: el recall del binario
 > cae de 0.818 a 0.119 con fotos reales de celular. Una predicción mala con una
 > foto propia es el comportamiento esperado, no necesariamente un bug. El
-> autotest sirve justo para distinguir los dos casos.
+> autotest sirve justo para distinguir los dos casos: si da 6/6, el pipeline
+> está bien y lo que falla es el modelo.
 
 ---
 

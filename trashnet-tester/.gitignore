@@ -71,3 +71,4 @@ Thumbs.db
 
 # Bundle generado por "npm run autotest"
 pruebas/autotest-node.cjs
+pruebas/comparar-preproceso.cjs

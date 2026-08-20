@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { DefinicionModelo, MODELOS, Resultado } from '../modelos/modelo';
-import { AutotestService, ResultadoAutotest } from '../servicios/autotest.service';
 import { InferenciaService } from '../servicios/inferencia.service';
+import { ModoPreproceso, MODOS } from '../servicios/opencv-pipeline';
+import { OpencvService } from '../servicios/opencv.service';
 import { PreprocesamientoService } from '../servicios/preprocesamiento.service';
 
 interface FilaResultado {
@@ -18,6 +19,7 @@ interface FilaResultado {
 })
 export class HomePage implements OnInit {
   readonly modelos = MODELOS;
+  readonly modos = MODOS;
   modeloSeleccionado: DefinicionModelo = MODELOS[0];
 
   imagenUrl: string | null = null;
@@ -28,17 +30,41 @@ export class HomePage implements OnInit {
   estado = '';
   error: string | null = null;
 
-  autotest: ResultadoAutotest[] = [];
-
   constructor(
     private inferencia: InferenciaService,
     private preproceso: PreprocesamientoService,
-    private autotestService: AutotestService,
+    public opencv: OpencvService,
   ) {}
 
+  get modoSeleccionado(): ModoPreproceso {
+    return this.preproceso.modo;
+  }
+
+  /** Cambiar de pipeline invalida los resultados que hay en pantalla. */
+  set modoSeleccionado(modo: ModoPreproceso) {
+    if (modo === this.preproceso.modo) {
+      return;
+    }
+    this.preproceso.modo = modo;
+    this.filas = [];
+    this.preproceso.precargar().catch(() => {
+      /* si falla, el error real se muestra al predecir */
+    });
+  }
+
+  get detalleModo(): string {
+    return this.modos.find((m) => m.id === this.modoSeleccionado)?.detalle ?? '';
+  }
+
+  /** Nombre corto del pipeline con que se obtuvo un resultado. */
+  nombreModo(modo: ModoPreproceso): string {
+    return this.modos.find((m) => m.id === modo)?.corto ?? modo;
+  }
+
   ngOnInit(): void {
-    // Crear la sesión ONNX y arrancar el WASM de OpenCV tarda ~1-2 s. Hacerlo
-    // ahora evita que ese costo se sume a la primera predicción.
+    // Crear la sesión ONNX y arrancar los dos WASM (ONNX Runtime y OpenCV)
+    // tarda unos segundos. Hacerlo ahora evita que ese costo se sume a la
+    // primera predicción.
     this.inferencia.precargar(this.modeloSeleccionado).catch(() => {
       /* si falla, el error real se muestra al predecir */
     });
@@ -109,25 +135,6 @@ export class HomePage implements OnInit {
       this.cargando = false;
       this.estado = '';
     }
-  }
-
-  async correrAutotest(): Promise<void> {
-    this.cargando = true;
-    this.error = null;
-    this.autotest = [];
-    this.estado = 'Comparando contra las predicciones de PyTorch…';
-    try {
-      this.autotest = await this.autotestService.correr();
-    } catch (e) {
-      this.error = e instanceof Error ? e.message : String(e);
-    } finally {
-      this.cargando = false;
-      this.estado = '';
-    }
-  }
-
-  get autotestOk(): number {
-    return this.autotest.filter((r) => r.ok).length;
   }
 
   porcentaje(prob: number): string {

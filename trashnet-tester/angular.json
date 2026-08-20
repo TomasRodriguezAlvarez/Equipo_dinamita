@@ -34,9 +34,17 @@
                 "glob": "ort-wasm-simd-threaded.jsep.{wasm,mjs}",
                 "input": "node_modules/onnxruntime-web/dist",
                 "output": "assets/ort"
+              },
+              {
+                "glob": "opencv.js",
+                "input": "node_modules/@techstark/opencv-js/dist",
+                "output": "assets/opencv"
               }
             ],
-            "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "styles": [
+              "src/global.scss",
+              "src/theme/variables.scss"
+            ],
             "scripts": []
           },
           "configurations": {
@@ -116,7 +124,10 @@
                 "output": "./svg"
               }
             ],
-            "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "styles": [
+              "src/global.scss",
+              "src/theme/variables.scss"
+            ],
             "scripts": []
           },
           "configurations": {

@@ -15,15 +15,9 @@
 }
 
 .confianza {
-  margin: 0;
+  margin: 0 0 0.75rem;
   font-size: 2rem;
   font-weight: 600;
-}
-
-.regla {
-  color: var(--ion-color-medium);
-  font-size: 0.8rem;
-  margin: 0.25rem 0 0.75rem;
 }
 
 .fila-clase {
@@ -39,12 +33,20 @@
   margin: 0.5rem 0 0;
 }
 
-.resumen {
-  margin: 1rem 0 0;
-  font-weight: 600;
-  color: var(--ion-color-success);
+// Los botones de predecir viven en un pie fijo: con la foto cargada, la vista
+// previa y las tarjetas de resultado empujaban el segundo botón fuera de la
+// pantalla del teléfono y había que scrollear para llegar.
+.acciones ion-toolbar {
+  --padding-start: 0.75rem;
+  --padding-end: 0.75rem;
+  --padding-top: 0.5rem;
+  --padding-bottom: 0.5rem;
 }
 
-.resumen.mal {
-  color: var(--ion-color-danger);
+.acciones ion-button {
+  margin: 0 0 0.4rem;
+}
+
+.acciones ion-button:last-child {
+  margin-bottom: 0;
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { MODELOS } from '../modelos/modelo';
+import { ModoPreproceso } from './opencv-pipeline';
 import { InferenciaService } from './inferencia.service';
 import { PreprocesamientoService } from './preprocesamiento.service';
 
@@ -12,6 +13,7 @@ interface CasoEsperado {
 }
 
 export interface ResultadoAutotest {
+  modo: ModoPreproceso;
   modelo: string;
   imagen: string;
   claseEsperada: string;
@@ -35,7 +37,24 @@ export class AutotestService {
     private preproceso: PreprocesamientoService,
   ) {}
 
-  async correr(): Promise<ResultadoAutotest[]> {
+  /**
+   * @param modo implementación de preprocesamiento a usar. Se restaura la que
+   *   estaba seleccionada al terminar, incluso si algo falla: el autotest no
+   *   debería cambiarle el modo al usuario por debajo.
+   */
+  async correr(modo?: ModoPreproceso): Promise<ResultadoAutotest[]> {
+    const anterior = this.preproceso.modo;
+    if (modo) {
+      this.preproceso.modo = modo;
+    }
+    try {
+      return await this.correrConModoActual();
+    } finally {
+      this.preproceso.modo = anterior;
+    }
+  }
+
+  private async correrConModoActual(): Promise<ResultadoAutotest[]> {
     const respuesta = await fetch('assets/pruebas/esperado.json');
     if (!respuesta.ok) {
       throw new Error('Falta assets/pruebas/esperado.json (correr scripts/generar_autotest.py)');
@@ -60,6 +79,7 @@ export class AutotestService {
 
       const resultado = await this.inferencia.predecir(modelo, img);
       salida.push({
+        modo: this.preproceso.modo,
         modelo: caso.modelo,
         imagen: caso.imagen.split('/').pop() ?? caso.imagen,
         claseEsperada: caso.clase,

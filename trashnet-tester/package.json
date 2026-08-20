@@ -10,8 +10,9 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "autotest": "npx esbuild pruebas/autotest-node.ts --bundle --platform=node --format=cjs --external:onnxruntime-web --external:jpeg-js --outfile=pruebas/autotest-node.cjs --log-level=warning && node pruebas/autotest-node.cjs",
-    "android:apk": "ng build --configuration production && npx cap sync android && cd android && ./gradlew assembleDebug"
+    "autotest": "npx esbuild pruebas/autotest-node.ts --bundle --platform=node --format=cjs --external:onnxruntime-web --external:jpeg-js --external:@techstark/opencv-js --outfile=pruebas/autotest-node.cjs --log-level=warning && node pruebas/autotest-node.cjs",
+    "android:apk": "ng build --configuration production && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "preproceso": "npx esbuild pruebas/comparar-preproceso.ts --bundle --platform=node --format=cjs --external:onnxruntime-web --external:jpeg-js --external:@techstark/opencv-js --outfile=pruebas/comparar-preproceso.cjs --log-level=warning && node pruebas/comparar-preproceso.cjs"
   },
   "private": true,
   "dependencies": {
@@ -32,6 +33,7 @@
     "@capacitor/status-bar": "8.0.3",
     "@ionic/angular": "^8.0.0",
     "@ionic/pwa-elements": "^3.4.0",
+    "@techstark/opencv-js": "^5.0.0-release.1",
     "ionicons": "^7.0.0",
     "onnxruntime-web": "^1.27.0",
     "rxjs": "~7.8.0",

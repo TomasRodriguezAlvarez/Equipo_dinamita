@@ -55,9 +55,13 @@ export class InferenciaService {
     return pendiente;
   }
 
-  /** Deja el modelo listo antes de que el usuario saque la foto. */
+  /** Deja el modelo y el preprocesamiento listos antes de la primera foto. */
   async precargar(modelo: DefinicionModelo): Promise<void> {
-    await Promise.all([this.cargarSesion(modelo), this.cargarEtiquetas(modelo)]);
+    await Promise.all([
+      this.cargarSesion(modelo),
+      this.cargarEtiquetas(modelo),
+      this.preproceso.precargar(),
+    ]);
   }
 
   async predecir(
@@ -70,7 +74,7 @@ export class InferenciaService {
     ]);
 
     const t0 = performance.now();
-    const datos = this.preproceso.aTensor(img, etiquetas);
+    const datos = await this.preproceso.aTensor(img, etiquetas);
     const t1 = performance.now();
 
     const lado = etiquetas.input_size;
@@ -89,6 +93,7 @@ export class InferenciaService {
 
     return {
       ...decision,
+      modo: this.preproceso.modo,
       probabilidades,
       msPreproceso: t1 - t0,
       msInferencia: t2 - t1,

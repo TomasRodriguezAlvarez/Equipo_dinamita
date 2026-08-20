@@ -2,28 +2,32 @@
  * Reimplementación del resample bilineal con antialias de Pillow
  * (`Resample.c`, `precompute_coeffs` + `ImagingResampleHorizontal/Vertical`).
  *
- * Por qué no se usa OpenCV para esto: los modelos se entrenaron con
- * `transforms.Resize((224,224))` de torchvision, que sobre una imagen PIL llama
- * a `Image.resize(..., BILINEAR)`. Ese bilineal escala el soporte del filtro con
- * el factor de reducción (o sea, hace antialias). OpenCV no tiene esa variante:
- * `INTER_LINEAR` no filtra, e `INTER_AREA` es un filtro de caja. Medido sobre
- * `imagenes_a_test/`, `INTER_AREA` daba hasta 27/255 de diferencia por píxel y
- * llegaba a cambiar la clase predicha del modelo jerárquico (verde → amarillo);
- * esto se queda en 1/255 sobre el 0.07% de los píxeles y no cambia ninguna.
+ * Por qué existe: los modelos se entrenaron con `transforms.Resize((224,224))`
+ * de torchvision, que sobre una imagen PIL llama a `Image.resize(..., BILINEAR)`.
+ * Ese bilineal escala el soporte del filtro con el factor de reducción (o sea,
+ * hace antialias). OpenCV no trae esa variante: `INTER_LINEAR` no filtra, e
+ * `INTER_AREA` es un filtro de caja. Medido sobre `imagenes_a_test/`,
+ * `INTER_AREA` daba hasta 27/255 de diferencia por píxel y llegaba a cambiar la
+ * clase predicha del modelo jerárquico (verde → amarillo); esto se queda en
+ * 1/255 sobre el 0.08% de los píxeles y no cambia ninguna.
+ *
+ * `precalcularCoeficientes()` se exporta porque `opencv-pipeline.ts` arma con
+ * esos mismos pesos las matrices que multiplica con `cv.gemm`: ahí el resample
+ * lo ejecuta OpenCV, pero el filtro sigue siendo este.
  *
  * Las dos pasadas son separables y van en el mismo orden que Pillow: primero
  * horizontal, después vertical, redondeando a uint8 en medio (ese redondeo
  * intermedio también es parte del algoritmo original).
  */
 
-interface Coeficientes {
+export interface Coeficientes {
   /** Primera columna/fila de entrada que aporta a este píxel de salida. */
   inicio: number;
   /** Pesos ya normalizados para que sumen 1. */
   pesos: Float64Array;
 }
 
-function precalcularCoeficientes(
+export function precalcularCoeficientes(
   tamEntrada: number,
   tamSalida: number,
 ): Coeficientes[] {
